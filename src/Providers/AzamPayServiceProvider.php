@@ -11,11 +11,11 @@ class AzamPayServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../Routes/shop-routes.php');  // Ensure you have a proper routes file for AzamPay
+        $this->loadRoutesFrom(__DIR__.'/../Routes/shop-routes.php');
 
-        $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'azampay');  // Make sure AzamPay translations are in place
+        $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'azampay');
 
-        $this->loadViewsFrom(__DIR__.'/../Resources/views', 'azampay');  // Views related to AzamPay (payment gateway page, etc.)
+        $this->loadViewsFrom(__DIR__.'/../Resources/views', 'azampay');
     }
 
     /**
@@ -31,12 +31,10 @@ class AzamPayServiceProvider extends ServiceProvider
      */
     protected function registerConfig(): void
     {
-        // Merges AzamPay specific payment method configurations
         $this->mergeConfigFrom(
             dirname(__DIR__).'/Config/paymentmethods.php', 'payment_methods'
         );
 
-        // Optionally, merge other configs if needed (e.g., system config, core config)
         $this->mergeConfigFrom(
             dirname(__DIR__).'/Config/system.php', 'core'
         );

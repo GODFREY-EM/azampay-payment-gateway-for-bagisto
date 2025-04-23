@@ -15,29 +15,18 @@ class AzamPay extends Payment
      */
     protected $code = 'azampay';
 
-    /**
-     * Returns the redirect URL for AzamPay.
-     */
     public function getRedirectUrl(): string
     {
-        return route('azampay.redirect');
+        return route('azampay.process');
     }
 
     /**
-     * Returns AzamPay payment method image.
+     * Returns payment method image.
      */
     public function getImage(): string
     {
         $url = $this->getConfigData('image');
 
-        return $url ? Storage::url($url) : bagisto_asset('images/azampay.png', 'shop');
-    }
-
-    /**
-     * Retrieves the configuration data for AzamPay.
-     */
-    public function getConfigData(string $key)
-    {
-        return core()->getConfigData('sales.payment_methods.' . $this->code . '.' . $key);
+        return $url ? Storage::url($url) : bagisto_asset('images/money-transfer.png', 'shop');
     }
 }
