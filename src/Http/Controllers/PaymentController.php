@@ -3,6 +3,7 @@
 namespace Webkul\AzamPay\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Controller;
 use Webkul\Checkout\Facades\Cart;
 use Webkul\Sales\Repositories\InvoiceRepository;
 use Webkul\Sales\Repositories\OrderRepository;
@@ -13,11 +14,6 @@ class PaymentController extends Controller
 {
     /**
      * Create a new controller instance.
-     *
-     * @return void
-     *
-     * @var OrderRepository
-     * @var InvoiceRepository
      */
     public function __construct(
         protected OrderRepository $orderRepository,
@@ -27,65 +23,93 @@ class PaymentController extends Controller
     }
 
     /**
-     * Redirects to the AzamPay payment gateway.
+     * Redirects the customer to the AzamPay payment gateway.
      */
     public function redirect(): RedirectResponse
     {
         $cart = Cart::getCart();
-        $billingAddress = $cart->billing_address;
+
+        // Prepare the cart items for AzamPay
+        $cartItems = [];
+        foreach ($cart->items as $item) {
+            $cartItems[] = [
+                'name'     => $item->name,
+                'sku'      => $item->sku,
+                'price'    => $item->price,
+                'quantity' => $item->quantity,
+                // Add more fields as expected by AzamPay if needed
+            ];
+        }
 
         $paymentData = [
-            'amount'          => $cart->grand_total, // Amount to charge
-            'currency'        => $cart->global_currency_code,
-            'description'     => 'AzamPay Checkout Payment for order id - '.$cart->id,
-            'client_id'       => core()->getConfigData('sales.payment_methods.azampay.client_id'),
-            'client_secret'   => core()->getConfigData('sales.payment_methods.azampay.client_secret'),
-            'success_url'     => route('azampay.success'),
-            'cancel_url'      => route('azampay.cancel'),
+            'amount'         => $cart->grand_total,
+            'currency'       => $cart->global_currency_code,
+            'order_id'       => (string) $cart->id,
+            'success_url'    => route('azampay.success'),
+            'fail_url'       => route('azampay.cancel'),
+            'cancel_url'     => route('azampay.cancel'),
+            'vendor_id'      => env('AZAMPAY_VENDOR_ID', config('azampay.vendor_id')),
+            'vendor_name'    => env('AZAMPAY_VENDOR_NAME', config('azampay.vendor_name')),
+            'request_origin' => config('app.url'),
+            'language'       => 'en',
+            'cart'           => ['items' => $cartItems],
         ];
 
-        $azampayHelper = new AzamPayHelper(); // Assuming this helper manages the AzamPay integration
-        $checkoutSessionUrl = $azampayHelper->createCheckoutSession($paymentData);
+        $azamPayHelper = new AzamPayHelper();
 
-        return redirect()->away($checkoutSessionUrl);
+        try {
+            $checkoutSessionUrl = $azamPayHelper->createCheckoutSession($paymentData);
+            return redirect()->away($checkoutSessionUrl);
+        } catch (\Throwable $e) {
+            report($e);
+            session()->flash('error', 'AzamPay redirection failed: ' . $e->getMessage());
+            return redirect()->route('shop.checkout.onepage.index');
+        }
     }
 
     /**
-     * Place an order and redirect to the success page after successful AzamPay payment.
+     * Handles the AzamPay success redirect and finalizes the order.
      */
     public function success(): RedirectResponse
     {
         $cart = Cart::getCart();
+        $orderData = (new OrderResource($cart))->jsonSerialize();
 
-        $data = (new OrderResource($cart))->jsonSerialize();
-
-        $order = $this->orderRepository->create($data);
+        $order = $this->orderRepository->create($orderData);
+        $order = $this->orderRepository->find($order->id);
 
         if ($order->canInvoice()) {
             $this->invoiceRepository->create($this->prepareInvoiceData($order));
         }
 
         Cart::deActivateCart();
-
         session()->flash('order_id', $order->id);
 
         return redirect()->route('shop.checkout.onepage.success');
     }
 
     /**
-     * Prepares order's invoice data for creation.
+     * Handles the AzamPay cancel/failure redirect.
+     */
+    public function cancel(): RedirectResponse
+    {
+        session()->flash('error', 'Your AzamPay payment was cancelled or failed.');
+        return redirect()->route('shop.checkout.onepage.index');
+    }
+
+    /**
+     * Prepares invoice data from the order for creation.
      */
     protected function prepareInvoiceData($order): array
     {
-        $invoiceData = [
-            'order_id' => $order->id,
-            'invoice'  => ['items' => []],
-        ];
-
+        $items = [];
         foreach ($order->items as $item) {
-            $invoiceData['invoice']['items'][$item->id] = $item->qty_to_invoice;
+            $items[$item->id] = $item->qty_to_invoice;
         }
 
-        return $invoiceData;
+        return [
+            'order_id' => $order->id,
+            'invoice'  => ['items' => $items],
+        ];
     }
 }

@@ -27,7 +27,7 @@ class Payment
     {
         $paymentMethods = [];
 
-        foreach (Config::get('payment_methods') as $paymentMethodConfig) {
+        foreach (Config::get('azampay.payment_methods', []) as $paymentMethodConfig) {
             $paymentMethod = app($paymentMethodConfig['class']);
 
             if ($paymentMethod->isAvailable()) {
@@ -60,7 +60,7 @@ class Payment
      */
     public function getRedirectUrl($cart)
     {
-        $payment = app(Config::get('payment_methods.'.$cart->payment->method.'.class'));
+        $payment = app(Config::get('azampay.payment_methods.'.$cart->payment->method.'.class'));
 
         return $payment->getRedirectUrl();
     }
@@ -73,7 +73,7 @@ class Payment
      */
     public static function getAdditionalDetails($code): array
     {
-        $paymentMethodClass = app(Config::get('payment_methods.'.$code.'.class'));
+        $paymentMethodClass = app(Config::get('azampay.payment_methods.'.$code.'.class'));
 
         return $paymentMethodClass->getAdditionalDetails();
     }

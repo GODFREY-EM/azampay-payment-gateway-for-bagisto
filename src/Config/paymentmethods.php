@@ -8,6 +8,6 @@ return [
         'image'       => '/images/azampay.png',
         'class'       => 'Webkul\AzamPay\Payment\AzamPay',
         'active'      => true,
-        'sort'        => 0,
+        'sort'        => 6,
     ],
 ];
